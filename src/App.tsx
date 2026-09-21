@@ -20,9 +20,15 @@ function App() {
         </div>
         <div>
           <h1>Infraestructura para el desarrollo continuo</h1>
-          <p>Version 2: modificado con IA y desplegado automaticamente desde GitHub</p>
           <p>
-            Edit <code>src/App.tsx</code> or <code>worker/index.ts</code> and save to test <code>HMR</code>
+            Para un despliegue fácil y rápido, esta aplicación fue creada y
+            modificada con ayuda de IA (Claude), publicada en GitHub y
+            desplegada automáticamente en Cloudflare Workers.
+          </p>
+          <p>
+            Flujo: <strong>GitHub</strong> → <strong>Cloudflare Workers</strong> →{' '}
+            <strong>sitio en línea</strong>. Cada <code>git push</code> a{' '}
+            <code>main</code> genera un nuevo despliegue.
           </p>
         </div>
         <ul style={{ display: 'flex', gap: '1rem', listStyle: 'none', padding: 0 }}>
