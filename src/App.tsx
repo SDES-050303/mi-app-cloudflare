@@ -8,6 +8,7 @@ import './App.css'
 function App() {
   const [count, setCount] = useState(0)
   const [name, setName] = useState('unknown')
+  const [message, setMessage] = useState('')
 
   return (
     <>
@@ -18,7 +19,8 @@ function App() {
           <img src={viteLogo} className="vite" alt="Vite logo" />
         </div>
         <div>
-          <h1>Get started with Cloudflare</h1>
+          <h1>Infraestructura para el desarrollo continuo</h1>
+          <p>Version 2: modificado con IA y desplegado automaticamente desde GitHub</p>
           <p>
             Edit <code>src/App.tsx</code> or <code>worker/index.ts</code> and save to test <code>HMR</code>
           </p>
@@ -38,7 +40,10 @@ function App() {
             onClick={() => {
               fetch('/api/')
                 .then((res) => res.json())
-                .then((data) => setName(data.name))
+                .then((data) => {
+                  setName(data.name)
+                  setMessage(`${data.message} (${new Date(data.time).toLocaleTimeString()})`)
+                })
             }}
             aria-label='get name'
           >
@@ -46,8 +51,7 @@ function App() {
           </button>
           </li>
         </ul>
-
-
+        {message && <p className="api-message">{message}</p>}
       </section>
 
       <div className="ticks"></div>
