@@ -1,4 +1,4 @@
-# UAT Report - Práctica 5: Publicar en Cloudflare
+# UAT Report - Práctica 7: Pipeline con UAT
 
 | Campo | Detalle |
 | --- | --- |
@@ -6,11 +6,12 @@
 | Repositorio | https://github.com/SDES-050303/mi-app-cloudflare |
 | Responsable | Sergio David Elizondo Silva |
 | Fecha de preparación | 2026-10-04 |
+| Fecha de ejecución UAT | 2026-11-09 |
 | Entorno bajo prueba | Producción (Cloudflare Workers, proyecto `mi-app-cloudflare-prod`) |
-| URL de producción | https://mi-app-cloudflare-prod.sergio-elizondo.workers.dev (confirmar en el dashboard tras el primer despliegue) |
+| URL de producción | https://mi-app-cloudflare-prod.sergio-elizondo.workers.dev |
 | URL de desarrollo | https://mi-app-cloudflare.sergio-elizondo.workers.dev |
 
-> Estado de este documento: las secciones 2 y 3 (pruebas unitarias y cobertura) contienen resultados reales de una ejecución local. Las secciones 4 y 5 (pipeline y pruebas de aceptación en producción) se llenan **después** de que el pipeline despliegue; hasta entonces están marcadas como pendientes.
+> Estado de este documento: completo. Las secciones 2 y 3 contienen resultados de una ejecución local; las secciones 4 y 5 contienen los resultados reales del pipeline en GitHub Actions y de las pruebas de aceptación sobre producción (2026-11-09).
 
 ## 1. Alcance
 
@@ -63,13 +64,15 @@ Archivo: `.github/workflows/ci-cd.yml`. Se ejecuta en cada push a `main`, en pul
 
 Secretos requeridos en GitHub (Settings > Secrets and variables > Actions): `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID`.
 
-Resultado de la ejecución real (llenar después del push):
+Resultado de la ejecución real:
 
-- [ ] Run del workflow: _(pegar enlace a la ejecución en la pestaña Actions)_
-- [ ] Job `build-test`: _(verde / rojo)_
-- [ ] Job `deploy-prod`: _(verde / rojo)_
-- [ ] Artefactos visibles: `coverage-report`, `dist-production`
+- [x] Run del workflow: [#2 (intento 2)](https://github.com/SDES-050303/mi-app-cloudflare/actions/runs/42735016614), commit `9139fb9`, duración total 51 s
+- [x] Job `build-test`: verde (19 s): lint, 7/7 pruebas, cobertura 100%, build de producción
+- [x] Job `deploy-prod`: verde (25 s): despliegue a `mi-app-cloudflare-prod` y prueba de humo a `/api/` aprobada
+- [x] Artefactos visibles: `coverage-report` (48 KB), `dist-production` (94 KB)
 - Captura: `docs/evidence/pipeline.png`
+
+Incidencia encontrada: las dos primeras ejecuciones fallaron en el paso *Deploy to Cloudflare Workers* porque no existían los secretos `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID` en el repositorio. Se creó un API token dedicado para GitHub Actions (plantilla "Edit Cloudflare Workers" + D1 Edit), se registraron ambos secretos y se re-ejecutó el job; pasó en verde.
 
 ## 5. Pruebas de aceptación en producción (UAT)
 
@@ -77,14 +80,23 @@ Se ejecutan en el navegador contra la URL de producción, después de un desplie
 
 | ID | Caso | Pasos | Resultado esperado | Resultado real | Estado |
 | --- | --- | --- | --- | --- | --- |
-| UAT-01 | La página carga | Abrir la URL de producción | Se ve el título "Infraestructura para el desarrollo continuo" y el mensaje sobre el despliegue con IA | _(pendiente)_ | Pendiente |
-| UAT-02 | El contador funciona | Hacer clic dos veces en "Count is" | El botón muestra "Count is 2" | _(pendiente)_ | Pendiente |
-| UAT-03 | La API del Worker responde | Abrir `/api/` | JSON con `name: "Cloudflare"`, `message` y `time` | _(pendiente)_ | Pendiente |
-| UAT-04 | El botón consume la API | Clic en "Name from API is" | El botón muestra "Cloudflare" y aparece el mensaje con la hora | _(pendiente)_ | Pendiente |
-| UAT-05 | Lectura de D1 | Abrir `/api/db` | JSON `{"notas":[...]}` con el registro de ejemplo | _(pendiente)_ | Pendiente |
-| UAT-06 | Ruta inexistente | Abrir `/no-existe` | La aplicación la maneja como página de una sola vista (SPA); `/api/` y `/api/db` siguen funcionando | _(pendiente)_ | Pendiente |
+| UAT-01 | La página carga | Abrir la URL de producción | Se ve el título "Infraestructura para el desarrollo continuo" y el mensaje sobre el despliegue con IA | Carga el título y el mensaje sobre el despliegue con IA | Aprobado |
+| UAT-02 | El contador funciona | Hacer clic dos veces en "Count is" | El botón muestra "Count is 2" | Muestra "Count is 2" | Aprobado |
+| UAT-03 | La API del Worker responde | Abrir `/api/` | JSON con `name: "Cloudflare"`, `message` y `time` | HTTP 200 `application/json`: `{"name":"Cloudflare","message":"Hola desde un Cloudflare Worker!","time":"2026-11-10T01:58:30.479Z"}` | Aprobado |
+| UAT-04 | El botón consume la API | Clic en "Name from API is" | El botón muestra "Cloudflare" y aparece el mensaje con la hora | Muestra "Name from API is: Cloudflare" y "Hola desde un Cloudflare Worker! (7:58:27 PM)" | Aprobado |
+| UAT-05 | Lectura de D1 | Abrir `/api/db` | JSON `{"notas":[...]}` con el registro de ejemplo | HTTP 200: `{"notas":[{"id":1,"texto":"Primer registro creado para la tarea de D1",...}]}` | Aprobado |
+| UAT-06 | Ruta inexistente | Abrir `/no-existe` | La aplicación la maneja como página de una sola vista (SPA); `/api/` y `/api/db` siguen funcionando | HTTP 200 con el `index.html` de la SPA; `/api/` y `/api/db` siguen respondiendo JSON | Aprobado |
 
-Capturas de evidencia (guardar en `docs/evidence/`): `prod-home.png`, `prod-api.png`, `prod-api-db.png`.
+Resumen: 6 casos, 6 aprobados, 0 fallidos.
+
+Capturas de evidencia:
+
+| Captura | Archivo |
+| --- | --- |
+| Pipeline en verde | ![pipeline](evidence/pipeline.png) |
+| Página principal (UAT-01, 02, 04) | ![home](evidence/prod-home.png) |
+| `/api/` (UAT-03) | ![api](evidence/prod-api.png) |
+| `/api/db` (UAT-05) | ![api-db](evidence/prod-api-db.png) |
 
 ## 6. Observaciones y riesgos
 
@@ -94,7 +106,9 @@ Capturas de evidencia (guardar en `docs/evidence/`): `prod-home.png`, `prod-api.
 
 ## 7. Conclusión
 
-Pendiente de completar tras la ejecución del pipeline: aceptar o rechazar la entrega según los resultados de las secciones 4 y 5.
+El pipeline compila, ejecuta las pruebas unitarias con cobertura (100%, umbral 80%), publica los artefactos `coverage-report` y `dist-production`, y despliega el artefacto a un proyecto nuevo de Cloudflare (`mi-app-cloudflare-prod`). Los 6 casos de aceptación en producción se aprobaron.
 
-- [ ] Aceptado
+- [x] Aceptado
 - [ ] Rechazado
+
+URL del proyecto en producción: https://mi-app-cloudflare-prod.sergio-elizondo.workers.dev
