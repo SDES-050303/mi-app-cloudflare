@@ -99,6 +99,33 @@ git push -u origin main
 
 4. Cloudflare detecta el push, vuelve a compilar y publica solo. Recarga el sitio (Ctrl+F5) para ver los cambios.
 
+## Pruebas unitarias y cobertura
+
+Las pruebas usan [Vitest](https://vitest.dev/) y React Testing Library. El Worker se prueba con una base D1 simulada, así que no necesitan cuenta de Cloudflare.
+
+```bash
+npm test               # corre las pruebas una vez
+npm run test:coverage  # pruebas + reporte de cobertura (carpeta coverage/)
+```
+
+El reporte HTML queda en `coverage/index.html`. Si la cobertura baja de 80%, el comando falla.
+
+## Pipeline CI/CD (GitHub Actions)
+
+El archivo `.github/workflows/ci-cd.yml` tiene dos jobs:
+
+1. **build-test:** instala dependencias, corre lint, pruebas con cobertura y el build, y publica los artefactos `coverage-report` y `dist-production`.
+2. **deploy-prod:** descarga el artefacto y lo despliega con Wrangler a un proyecto nuevo de Cloudflare (`mi-app-cloudflare-prod`). Solo corre en push a `main`.
+
+Para que el despliegue funcione, crea estos secretos en GitHub (Settings > Secrets and variables > Actions):
+
+| Secreto | De dónde sale |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare > My Profile > API Tokens > plantilla "Edit Cloudflare Workers" (agrega permiso D1 Edit si lo pide) |
+| `CLOUDFLARE_ACCOUNT_ID` | Dashboard de Cloudflare > Workers & Pages > panel derecho "Account ID" |
+
+El reporte de aceptación está en [docs/UAT-REPORT.md](docs/UAT-REPORT.md).
+
 ## Comandos útiles
 
 | Comando | Qué hace |

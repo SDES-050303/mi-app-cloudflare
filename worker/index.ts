@@ -1,6 +1,11 @@
 export default {
-  fetch(request) {
+  async fetch(request, env) {
     const url = new URL(request.url);
+
+    if (url.pathname === "/api/db") {
+      const { results } = await env.DB.prepare("SELECT * FROM notas").all();
+      return Response.json({ notas: results });
+    }
 
     if (url.pathname.startsWith("/api/")) {
       return Response.json({
@@ -9,6 +14,7 @@ export default {
         time: new Date().toISOString(),
       });
     }
+
     return new Response(null, { status: 404 });
   },
 } satisfies ExportedHandler<Env>;

@@ -13,7 +13,32 @@
 	"observability": {
 		"enabled": true
 	},
-	"upload_source_maps": true
+
+		"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "mi_app_db",
+			"database_id": "8b5feeca-6d15-4cfc-8023-4d109be46f92"
+		}
+	],
+
+	"upload_source_maps": true,
+
+	// Entorno de PRODUCCION: se despliega como un Worker/proyecto nuevo en Cloudflare
+	// (mi-app-cloudflare-prod) desde GitHub Actions. Los bindings no se heredan,
+	// por eso se declara de nuevo la base de datos D1.
+	"env": {
+		"production": {
+			"name": "mi-app-cloudflare-prod",
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "mi_app_db",
+					"database_id": "8b5feeca-6d15-4cfc-8023-4d109be46f92"
+				}
+			]
+		}
+	}
 	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement

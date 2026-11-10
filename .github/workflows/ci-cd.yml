@@ -1,0 +1,123 @@
+name: CI/CD - Build, Test y Deploy a Produccion
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Evita dos despliegues simultaneos a produccion
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: compilar, correr pruebas unitarias con cobertura y publicar artefactos
+  # ---------------------------------------------------------------------------
+  build-test:
+    name: Build + Unit tests + Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests with coverage
+        run: npm run test:coverage
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          node -e "
+          const fs = require('fs');
+          if (!fs.existsSync('coverage/coverage-summary.json')) process.exit(0);
+          const t = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8')).total;
+          const rows = ['statements', 'branches', 'functions', 'lines']
+            .map((k) => '| ' + k + ' | ' + t[k].covered + '/' + t[k].total + ' | ' + t[k].pct + '% |')
+            .join('\n');
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+            '## Coverage\n\n| Metric | Covered | % |\n| --- | --- | --- |\n' + rows + '\n');
+          "
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          if-no-files-found: error
+
+      # CLOUDFLARE_ENV=production hace que el build use el entorno "production"
+      # de wrangler.jsonc (Worker mi-app-cloudflare-prod).
+      - name: Build (production)
+        run: npm run build
+        env:
+          CLOUDFLARE_ENV: production
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-production
+          path: dist/
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Job 2: publicar el artefacto en un proyecto nuevo de Cloudflare (Prod)
+  # Solo corre en push a main (no en pull requests)
+  # ---------------------------------------------------------------------------
+  deploy-prod:
+    name: Deploy to Cloudflare (Prod)
+    needs: build-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://mi-app-cloudflare-prod.sergio-elizondo.workers.dev
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-production
+          path: dist
+
+      - name: Deploy to Cloudflare Workers
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '4'
+          command: deploy --config dist/mi_app_cloudflare/wrangler.json
+
+      - name: Smoke test
+        run: |
+          URL="${{ steps.deploy.outputs.deployment-url }}"
+          if [ -z "$URL" ]; then URL="https://mi-app-cloudflare-prod.sergio-elizondo.workers.dev"; fi
+          echo "Probando $URL/api/"
+          for i in 1 2 3 4 5; do
+            if curl -fsS "$URL/api/" | tee /dev/stderr | grep -q '"name":"Cloudflare"'; then
+              echo; echo "OK: la aplicacion responde en produccion"
+              exit 0
+            fi
+            echo "Intento $i fallo, reintentando..."; sleep 5
+          done
+          echo "La aplicacion no respondio como se esperaba"; exit 1
